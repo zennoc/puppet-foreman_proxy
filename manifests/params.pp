@@ -60,6 +60,13 @@ class foreman_proxy::params {
   $puppetrun          = true
   $puppetrun_cmd      = $puppet::params::puppetrun_cmd
   $puppetrun_provider = ''
+  $customrun_cmd      = '/bin/false'
+  $customrun_args     = '-ay -f -s'
+  $puppetssh_sudo     = false
+  $puppetssh_command  = '/usr/bin/puppet agent --onetime --no-usecacheonfailure'
+  $puppetssh_user     = 'root'
+  $puppetssh_keyfile  = '/etc/foreman-proxy/id_rsa'
+  $puppet_user        = 'root'
 
   # TFTP settings - requires optional TFTP puppet module
   $tftp           = true
@@ -117,14 +124,18 @@ class foreman_proxy::params {
   }
 
   # DNS settings - requires optional DNS puppet module
-  $dns           = false
-  $dns_managed   = true
-  $dns_provider  = 'nsupdate'
-  $dns_interface = 'eth0'
-  $dns_zone      = $::domain
-  $dns_reverse   = '100.168.192.in-addr.arpa'
+  $dns                = false
+  $dns_managed        = true
+  $dns_provider       = 'nsupdate'
+  $dns_interface      = 'eth0'
+  $dns_zone           = $::domain
+  $dns_realm          = upcase($dns_zone)
+  $dns_reverse        = '100.168.192.in-addr.arpa'
   # localhost can resolve to ipv6 which ruby doesn't handle well
-  $dns_server    = '127.0.0.1'
+  $dns_server         = '127.0.0.1'
+  $dns_ttl            = '86400'
+  $dns_tsig_keytab    = '/etc/foreman-proxy/dns.keytab'
+  $dns_tsig_principal = "foremanproxy/${::fqdn}@${dns_realm}"
   case $::operatingsystem {
     Debian,Ubuntu: {
       $keyfile = '/etc/bind/rndc.key'
@@ -138,9 +149,19 @@ class foreman_proxy::params {
 
   $dns_forwarders = []
 
+  # virsh options
+  $virsh_network = 'default'
+
   # BMC options
   $bmc = false
   $bmc_default_provider = 'ipmitool'
+
+  # Realm management options
+  $realm = false
+  $realm_provider = 'freeipa'
+  $realm_keytab = '/etc/foreman-proxy/freeipa.keytab'
+  $realm_principal = 'realm-proxy@EXAMPLE.COM'
+  $freeipa_remove_dns = true
 
   # Proxy can register itself within a Foreman instance
   $register_in_foreman = true
@@ -158,7 +179,7 @@ class foreman_proxy::params {
   $oauth_consumer_secret = cache_data('oauth_consumer_secret', random_password(32))
 
   $foreman_api_package = $::osfamily ? {
-    Debian  => 'ruby-foreman-api',
-    default => 'rubygem-foreman_api',
+    Debian  => 'ruby-apipie-bindings',
+    default => 'rubygem-apipie-bindings',
   }
 }

@@ -1,7 +1,6 @@
 ---
 ### File managed with puppet ###
 ## Module:           '<%= scope.to_hash['module_name'] %>'
-## Template source:  'MODULES<%= template_source.gsub(Regexp.new("^#{Puppet::Node::Environment.current[:modulepath].gsub(':','|')}"),"") %>'
 
 # SSL Setup
 
@@ -53,13 +52,33 @@
 
 # Enable DNS management
 :dns: <%= scope.lookupvar("foreman_proxy::dns") %>
+# valid providers:
+#   dnscmd (Microsoft Windows native implementation)
+#   nsupdate
+#   nsupdate_gss (for GSS-TSIG support)
+#   virsh (simple implementation for libvirt)
 :dns_provider: <%= scope.lookupvar("foreman_proxy::dns_provider") %>
 :dns_key: <%= scope.lookupvar("foreman_proxy::keyfile") %>
 # use this setting if you are managing a dns server which is not localhost though this proxy
 :dns_server: <%= scope.lookupvar("foreman_proxy::dns_server") %>
+# use this setting if you want to override default TTL setting (86400)
+:dns_ttl: <%= scope.lookupvar("foreman_proxy::dns_ttl") %>
+# use dns_tsig_* for GSS-TSIG updates using Kerberos.  Required for Windows MS DNS with
+# Secure Dynamic Updates, or BIND as used in FreeIPA.  Set dns_provider to nsupdate_gss.
+<%if scope.lookupvar("foreman_proxy::dns_provider") == 'nsupdate_gss' -%>
+:dns_tsig_keytab: <%= scope.lookupvar("foreman_proxy::dns_tsig_keytab") %>
+:dns_tsig_principal: <%= scope.lookupvar("foreman_proxy::dns_tsig_principal") %>
+<% else -%>
+#:dns_tsig_keytab: /usr/share/foreman-proxy/dns.keytab
+#:dns_tsig_principal: DNS/host.example.com@EXAMPLE.COM
+<% end -%>
 
 # Enable DHCP management
 :dhcp: <%= scope.lookupvar("foreman_proxy::dhcp") %>
+# valid vendors:
+#   - isc
+#   - native_ms (Microsoft native implementation)
+#   - virsh (simple implementation for libvirt)
 <% if scope.lookupvar("foreman_proxy::dhcp") == true -%>
 :dhcp_vendor: <%= scope.lookupvar("foreman_proxy::dhcp_vendor") %>
 :dhcp_config: <%= scope.lookupvar("foreman_proxy::dhcp_config") %>
@@ -85,6 +104,9 @@
 #:dhcp_leases: /var/lib/dhcpd/dhcpd.leases
 <% end -%>
 
+# shared options for virsh DNS/DHCP provider
+:virsh_network: <%= scope.lookupvar("foreman_proxy::virsh_network") %>
+
 # enable PuppetCA management
 :puppetca: <%= scope.lookupvar("foreman_proxy::puppetca") %>
 :ssldir: <%= scope.lookupvar("foreman_proxy::ssldir") %>
@@ -93,8 +115,43 @@
 # enable Puppet management
 :puppet: <%= scope.lookupvar("foreman_proxy::puppetrun") %>
 :puppet_conf: <%= scope.lookupvar("foreman_proxy::puppetdir") %>/puppet.conf
+# valid providers:
+#   puppetrun   (for puppetrun/kick, deprecated in Puppet 3)
+#   mcollective (uses mco puppet)
+#   puppetssh   (run puppet over ssh)
+#   salt        (uses salt puppet.run)
+#   customrun   (calls a custom command with args)
 <% if scope.lookupvar("foreman_proxy::puppetrun_provider") != '' -%>
 :puppet_provider: <%= scope.lookupvar("foreman_proxy::puppetrun_provider") %>
+<% else -%>
+#:puppet_provider: puppetrun
+<% end -%>
+
+# customrun command details
+# Set :customrun_cmd to the full path of the script you want to run, instead of /bin/false
+:customrun_cmd: <%= scope.lookupvar("foreman_proxy::customrun_cmd") %>
+# Set :customrun_args to any args you want to pass to your custom script. The hostname of the
+# system to run against will be appended after the custom commands.
+:customrun_args: <%= scope.lookupvar("foreman_proxy::customrun_args") %>
+
+# whether to use sudo before the ssh command
+:puppetssh_sudo: <%= scope.lookupvar("foreman_proxy::puppetssh_sudo") %>
+# the command which will be sent to the host
+:puppetssh_command: <%= scope.lookupvar("foreman_proxy::puppetssh_command") %>
+# With which user should the proxy connect
+<% if scope.lookupvar("foreman_proxy::puppetrun_provider") == 'puppetssh' -%>
+:puppetssh_user: <%= scope.lookupvar("foreman_proxy::puppetssh_user") %>
+:puppetssh_keyfile: <%= scope.lookupvar("foreman_proxy::puppetssh_keyfile") %>
+<% else -%>
+#:puppetssh_user: root
+#:puppetssh_keyfile: /etc/foreman-proxy/id_rsa
+<% end -%>
+
+# Which user to invoke sudo as to run puppet commands
+<% if scope.lookupvar("foreman_proxy::puppetrun_provider") =~ /(mcollective|puppetrun)/ -%>
+:puppet_user: <%= scope.lookupvar("foreman_proxy::puppet_user") %>
+<% else -%>
+#:puppet_user: root
 <% end -%>
 
 # enable BMC management (Bare metal power and bios controls)
@@ -103,6 +160,21 @@
 # - shell - for local reboot control (requires sudo access to /sbin/shutdown for the proxy user)
 :bmc: <%= scope.lookupvar("foreman_proxy::bmc") %>
 :bmc_default_provider: <%= scope.lookupvar("foreman_proxy::bmc_default_provider") %>
+
+# Manage joining realms e.g. FreeIPA
+:realm: <%= scope.lookupvar("foreman_proxy::realm") %>
+
+# Available providers:
+#   freeipa
+:realm_provider: <%= scope.lookupvar("foreman_proxy::realm_provider") %>
+
+# Authentication for Kerberos-based Realms
+:realm_keytab: <%= scope.lookupvar("foreman_proxy::realm_keytab") %>
+:realm_principal: <%= scope.lookupvar("foreman_proxy::realm_principal") %>
+
+# FreeIPA specific settings
+# Remove from DNS when deleting the FreeIPA entry
+:freeipa_remove_dns: <%= scope.lookupvar("foreman_proxy::freeipa_remove_dns") %>
 
 # Where our proxy log files are stored
 # filename or STDOUT
